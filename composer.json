@@ -1,7 +1,10 @@
 {
     "name": "php-calendar/php-calendar",
     "description": "PHP Calendar",
-    "license": "Apache 2.0",
+    "version": "2.0.9",
+    "type": "project",
+    "homepage": "http://www.php-calendar.org/",
+    "license": "Apache-2.0",
     "authors": [
         {
             "name": "Sean Proctor",
