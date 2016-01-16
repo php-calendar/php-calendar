@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-class PhpcEvent {
+namespace PhpCalendar;
+
+class Event {
 	var $eid;
 	var $cid;
 	var $uid;
@@ -32,11 +34,11 @@ class PhpcEvent {
 	var $mtime;
 	var $cal;
 	var $fields;
+	var $db;
 
-	function __construct($event)
+	function __construct($context, $event)
 	{
-		global $phpcid, $phpc_cal, $phpcdb;
-
+		$this->db = $context->db;
 		$this->eid = $event['eid'];
 		$this->cid = $event['cid'];
 		$this->uid = $event['owner'];
@@ -57,10 +59,10 @@ class PhpcEvent {
 		$this->ctime = $event['ctime'];
 		$this->mtime = $event['mtime'];
 
-		if($this->cid == $phpcid)
-			$this->cal = $phpc_cal;
+		if($this->cid == $context->calendar->cid)
+			$this->cal = $context->calendar;
 		else
-			$this->cal = $phpcdb->get_calendar($this->cid);
+			$this->cal = $context->db->get_calendar($this->cid);
 	}
 
 	function get_raw_subject() {
@@ -128,26 +130,21 @@ class PhpcEvent {
 		return htmlspecialchars($this->category, ENT_COMPAT, "UTF-8");
 	}
 
-	function is_owner() {
-		global $phpc_user;
-
-		return $phpc_user->get_uid() == $this->get_uid();
+	function is_owner(User $user) {
+		return $user->get_uid() == $this->get_uid();
 	}
 
 	// returns whether or not the current user can modify $event
-	function can_modify()
+	function can_modify(User $user)
 	{
-		return $this->cal->can_admin() || $this->is_owner()
+		return $this->cal->can_admin($user) || $this->is_owner($user)
 			|| ($this->cal->can_modify() && !$this->is_readonly());
 	}
 
-	// returns whether or not the current user can read $event
-	function can_read() {
-		global $phpcdb, $phpc_user;
-
+	// returns whether or not the user can read this event
+	function can_read(User $user) {
 		$visible_category = empty($this->gid) || !isset($this->catid)
-			|| $phpcdb->is_cat_visible($phpc_user->get_uid(),
-					$this->catid);
+			|| $this->db->is_cat_visible($user->get_uid(), $this->catid);
 		return $this->cal->can_read() && $visible_category;
 	}
 
@@ -164,10 +161,8 @@ class PhpcEvent {
 	}
 
 	function get_fields() {
-		global $phpcdb;
-
 		if(!isset($this->fields))
-			$this->fields = $phpcdb->get_event_fields($this->eid);
+			$this->fields = $this->db->get_event_fields($this->eid);
 
 		return $this->fields;
 	}

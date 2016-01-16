@@ -15,28 +15,27 @@
  * limitations under the License.
  */
 
+namespace PhpCalendar;
+
 if ( !defined('IN_PHPC') ) {
        die("Hacking attempt");
 }
 
-require_once("$phpc_includes_path/Parsedown.php");
-
 // called when some error happens
 function soft_error($message)
 {
-	throw new Exception(escape_entities($message));
+	throw new \Exception(escape_entities($message));
 }
 
-class PermissionException extends Exception {
+class PermissionException extends \Exception {
 }
 
 function permission_error($message)
 {
-	throw new PermissionException(htmlspecialchars($message, ENT_COMPAT,
-				"UTF-8"));
+	throw new PermissionException(htmlspecialchars($message, ENT_COMPAT, "UTF-8"));
 }
 
-class InvalidInputException extends Exception {
+class InvalidInputException extends \Exception {
 	var $target;
 	function __construct($msg, $target) {
 		parent::__construct($msg);
@@ -45,15 +44,12 @@ class InvalidInputException extends Exception {
 }
 
 function input_error($message, $target) {
-	throw new InvalidInputException(htmlspecialchars($message, ENT_COMPAT,
-				"UTF-8"), $target);
+	throw new InvalidInputException(htmlspecialchars($message, ENT_COMPAT, "UTF-8"), $target);
 }
 
 function check_input($arg) {
-	global $vars;
-
-	if(!isset($vars[$arg]))
-		throw new Exception(sprintf(__('Required field "%s" is not set.'), $arg));
+	if(!isset($_REQUEST[$arg]))
+		throw new InvalidInputException(sprintf(__('Required field "%s" is not set.'), $arg));
 }
 
 function minute_pad($minute)
@@ -62,75 +58,25 @@ function minute_pad($minute)
 }
 
 function redirect($page) {
-	global $phpc_script, $phpc_server, $phpc_redirect, $phpc_proto;
-
 	session_write_close();
 
-	$phpc_redirect = true;
+	$dir = $page{0} == '/' ?  '' : dirname($script) . '/';
+	$url = PHPC_PROTOCOL . '://'. PHPC_SERVER . $dir . $page;
 
-	if($page{0} == "/") {
-		$dir = '';
-	} else {
-		$dir = dirname($phpc_script) . "/";
-	}
-	$url = "$phpc_proto://$phpc_server$dir$page";
-
-	header("Location: $url");
+	header("Location: $url", true, 303);
+	exit;
 }
 
-function message_redirect($message, $page) {
-	global $phpc_prefix;
+function message_redirect($message, $page, $css_classes) {
+	if(empty($_SESSION[PHPC_PREFIX . "messages"]))
+		$_SESSION[PHPC_PREFIX . "messages"] = array();
 
-	$tag = tag('div', attrs('class="phpc-message"'), $message);
-	if(empty($_SESSION["{$phpc_prefix}messages"]))
-		$_SESSION["{$phpc_prefix}messages"] = array();
-
-	$_SESSION["{$phpc_prefix}messages"][] = $tag;
+	$_SESSION[PHPC_PREFIX . "messages"][] = tag('div', attrs("class=\"phpc-message $css_classes\""), $message);
 	redirect($page);
-
-	$continue_url = $page . '&amp;clearmsg=1';
-
-	return tag('div', attrs('class="phpc-box"'), $tag,
- 		tag('a', attrs("href=\"$continue_url\""), __("continue")));
 }
 
 function error_message_redirect($message, $page) {
-	global $phpc_prefix;
-
-	$tag = tag('div', attrs('class="phpc-message ui-state-error"'),
-			$message);
-	if(empty($_SESSION["{$phpc_prefix}messages"]))
-		$_SESSION["{$phpc_prefix}messages"] = array();
-
-	$_SESSION["{$phpc_prefix}messages"][] = $tag;
-	redirect($page);
-
-	$continue_url = $page . '&amp;clearmsg=1';
-
-	return tag('div', attrs('class="phpc-box"'), $tag,
- 		tag('a', attrs("href=\"$continue_url\""), __("continue")));
-}
-
-function message($message) {
-	global $phpc_messages;
-
-	$phpc_messages[] = $message;
-}
-
-function stripslashes_r($var) {
-	if (is_array($var))
-		return array_map("stripslashes_r", $var);
-	else
-		return stripslashes($var);
-}
-
-function real_escape_r($var) {
-	global $phpcdb;
-
-	if(is_array($var))
-		return array_map("real_escape_r", $var);
-	else
-		return mysqli_real_escape_string($phpcdb->dbh, $var);
+	message_redirect($message, $page, 'ui-state-error');
 }
 
 function escape_entities($string) {

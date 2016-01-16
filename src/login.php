@@ -15,28 +15,28 @@
  * limitations under the License.
  */
 
+namespace PhpCalendar;
+
 if(!defined('IN_PHPC')) {
        die("Hacking attempt");
 }
 
-function login()
+function login(Context $context)
 {
-	global $vars, $phpc_script;
-
 	$html = tag('div');
 
 	//Check password and username
-	if(isset($vars['username'])){
-		$user = $vars['username'];
-		if(!isset($vars['password'])) {
-			message(__("No password specified."));
+	if(isset($_REQUEST['username'])){
+		$user = $_REQUEST['username'];
+		if(!isset($_REQUEST['password'])) {
+			$context->add_message(__("No password specified."));
 		} else {
-			$password = $vars['password'];
+			$password = $_REQUEST['password'];
 
-			if(login_user($user, $password)){
-				$url = $phpc_script;
-				if(!empty($vars['lasturl'])) {
-					$url .= '?' . urldecode($vars['lasturl']);
+			if(login_user($context, $user, $password)){
+				$url = PHPC_SCRIPT;
+				if(!empty($_REQUEST['lasturl'])) {
+					$url .= '?' . urldecode($_REQUEST['lasturl']);
 				}
 				redirect($url);
 				return tag('h2', __('Logged in.'));
@@ -53,18 +53,15 @@ function login()
 
 function login_form()
 {
-        global $vars, $phpc_script;
-
         $submit_data = tag('td', attributes('colspan="2"'),
                                 create_hidden('action', 'login'),
                                 create_submit(__('Log in')));
 
-        if(!empty($vars['lasturl'])) {
-                $submit_data->prepend(create_hidden('lasturl', escape_entities(urlencode($vars['lasturl']))));
+        if(!empty($_REQUEST['lasturl'])) {
+                $submit_data->prepend(create_hidden('lasturl', escape_entities(urlencode($_REQUEST['lasturl']))));
 	}
 
-	return tag('form', attributes("action=\"$phpc_script\"",
-				'method="post"'),
+	return tag('form', attributes('action="' . PHPC_SCRIPT . '"', 'method="post"'),
 		tag('table',
 			tag('caption', __('Log in')),
                         tag('thead',

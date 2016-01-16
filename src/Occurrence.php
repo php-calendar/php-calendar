@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-require_once("$phpc_includes_path/phpcevent.class.php");
+namespace PhpCalendar;
 
-class PhpcOccurrence extends PhpcEvent{
+class Occurrence extends Event
+{
 	var $oid;
 	var $start_year;
 	var $start_month;
@@ -32,8 +33,8 @@ class PhpcOccurrence extends PhpcEvent{
 	var $end_minute = NULL;
 	var $duration;
 
-	function __construct($event) {
-		parent::__construct($event);
+	function __construct($context, $event) {
+		parent::__construct($context, $event);
 
 		$this->oid = $event['oid'];
 

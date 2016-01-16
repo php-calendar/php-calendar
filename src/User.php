@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-class PhpcUser {
+namespace PhpCalendar;
+
+class User {
 	var $uid;
 	var $username;
 	var $password;
@@ -26,8 +28,9 @@ class PhpcUser {
 	var $language;
 	var $groups;
 	var $disabled;
+	var $db;
 
-	function PhpcUser($result)
+	function __construct(Database $db, $result)
 	{
 		$this->uid = $result['uid'];
 		$this->username = $result['username'];
@@ -67,10 +70,8 @@ class PhpcUser {
 	}
 	
 	function get_groups() {
-		global $phpcdb;
-
 		if(!isset($this->groups))
-			$this->groups = $phpcdb->get_user_groups($this->uid);
+			$this->groups = $this->db->get_user_groups($this->uid);
 
 		return $this->groups;
 	}
@@ -85,6 +86,11 @@ class PhpcUser {
 
 	function get_default_cid() {
 		return $this->default_cid;
+	}
+
+	function is_user()
+	{
+		return $this->uid > 0;
 	}
 }
 

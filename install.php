@@ -15,21 +15,22 @@
  * limitations under the License.
  */
 
+require_once 'vendor/autoload.php';
+
 /*
    Run this file to install the calendar
    it needs very much work
 */
 
-$phpc_root_path = dirname(__FILE__);
-$phpc_includes_path = "$phpc_root_path/includes";
-$phpc_config_file = "$phpc_root_path/config.php";
+define('PHPC_ROOT_PATH', dirname(__FILE__));
+define('PHPC_CONFIG_FILE', "$phpc_root_path/config.php");
 
 define('IN_PHPC', true);
 
 if(!function_exists("mysqli_connect"))
 	soft_error("You must have the mysqli extension for PHP installed to use this calendar.");
 
-require_once("$phpc_includes_path/calendar.php");
+require_once(PHPC_ROOT_PATH . "/src/helpers.php");
 
 ?><!DOCTYPE html>
 <html>
@@ -44,8 +45,8 @@ require_once("$phpc_includes_path/calendar.php");
 
 $must_upgrade = false;
 
-if(file_exists($phpc_config_file)) {
-	include_once($phpc_config_file);
+if(file_exists(PHPC_CONFIG_FILE)) {
+	include_once(PHPC_CONFIG_FILE);
 	if(defined("SQL_HOST")) {
 		$dbh = connect_db(SQL_HOST, SQL_USER, SQL_PASSWD, SQL_DATABASE);
 
@@ -92,8 +93,6 @@ foreach($_POST as $key => $value) {
 	echo "<input name=\"$key\" value=\"$value\" type=\"hidden\">\n";
 }
 
-$drop_tables = isset($_POST["drop_tables"]) && $_POST["drop_tables"] == "yes";
-
 if(!isset($_POST['my_hostname'])
 		&& !isset($_POST['my_username'])
 		&& !isset($_POST['my_passwd'])
@@ -114,13 +113,12 @@ if(!isset($_POST['my_hostname'])
 
 function check_config()
 {
-	global $phpc_config_file;
 
-	if(is_writable($phpc_config_file))
+	if(is_writable(PHPC_CONFIG_FILE))
 		return true;
 	
 	// Check if we can create the file
-	if($file = @fopen($phpc_config_file, 'a')) {
+	if($file = @fopen(PHPC_CONFIG_FILE, 'a')) {
 		fclose($file);
 		return true;
 	}
@@ -278,8 +276,6 @@ function create_config($sql_hostname, $sql_username, $sql_passwd, $sql_database,
 
 function install_base()
 {
-	global $phpc_config_file;
-
 	$sql_type = "mysqli";
 	$my_hostname = $_POST['my_hostname'];
 	$my_username = $_POST['my_username'];
@@ -287,7 +283,7 @@ function install_base()
 	$my_prefix = $_POST['my_prefix'];
 	$my_database = $_POST['my_database'];
 
-	$fp = fopen($phpc_config_file, 'w')
+	$fp = fopen(PHPC_CONFIG_FILE, 'w')
 		or soft_error('Couldn\'t open config file.');
 
 	fwrite($fp, create_config($my_hostname, $my_username, $my_passwd,
@@ -296,7 +292,7 @@ function install_base()
 	fclose($fp);
 
 	// Make the database connection.
-	include($phpc_config_file);
+	include(PHPC_CONFIG_FILE);
 	$dbh = connect_db(SQL_HOST, SQL_USER, SQL_PASSWD, SQL_DATABASE);
 
 	create_tables($dbh);
@@ -308,7 +304,7 @@ function install_base()
 	$dbh->query($query)
 		or install_db_error($dbh, 'Error creating version row.', $query);
 
-	echo "<p>Config file created at \"". realpath($phpc_config_file) ."\"</p>"
+	echo "<p>Config file created at \"". realpath(PHPC_CONFIG_FILE) ."\"</p>"
 		."<p>Calendars database created</p>\n"
 		."<div><input type=\"submit\" name=\"base\" value=\"continue\">"
 		."</div>\n";
@@ -316,9 +312,9 @@ function install_base()
 
 function create_tables($dbh)
 {
-	global $drop_tables, $phpc_includes_path;
+	$drop_tables = isset($_POST["drop_tables"]) && $_POST["drop_tables"] == "yes";
 
-	require_once("$phpc_includes_path/schema.php");
+	require_once(PHPC_ROOT_PATH . "/src/schema.php");
 
 	foreach(phpc_table_schemas() as $table) {
 		$table->create($dbh, $drop_tables);
@@ -347,9 +343,7 @@ function get_admin()
 
 function add_calendar()
 {
-	global $phpc_config_file;
-
-	require_once($phpc_config_file);
+	require_once(PHPC_CONFIG_FILE);
 
 	$calendar_title = 'PHP-Calendar';
 

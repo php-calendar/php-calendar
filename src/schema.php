@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright 2013 Sean Proctor
+ * Copyright 2016 Sean Proctor
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,13 @@
    this file contains the db schema and functions to use it.
 */
 
+namespace PhpCalendar;
+
 if ( !defined('IN_PHPC') ) {
        die("Hacking attempt");
 }
 
 define('PHPC_DB_VERSION', 2);
-
-require_once("$phpc_includes_path/phpcsql.php");
 
 function phpc_table_schemas() {
 	return array
@@ -46,7 +46,7 @@ function phpc_table_schemas() {
 }
 
 function phpc_calendars_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'calendars');
+	$table = new SqlTable(SQL_PREFIX . 'calendars');
 
 	$table->addColumn('cid', "int(11) unsigned NOT NULL auto_increment");
 	$table->addColumn('hours_24', "tinyint(1) NOT NULL DEFAULT '0'");
@@ -66,7 +66,7 @@ function phpc_calendars_table() {
 }
 
 function phpc_calendar_fields_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'calendar_fields');
+	$table = new SqlTable(SQL_PREFIX . 'calendar_fields');
 
 	$table->addColumn('cid', "int(11) unsigned");
 	$table->addColumn('name', "varchar(255) COLLATE utf8_unicode_ci NOT NULL");
@@ -75,7 +75,7 @@ function phpc_calendar_fields_table() {
 }
 
 function phpc_categories_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'categories');
+	$table = new SqlTable(SQL_PREFIX . 'categories');
 
 	$table->addColumn('catid', "int(11) unsigned NOT NULL auto_increment");
 	$table->addColumn('cid', "int(11) unsigned NOT NULL");
@@ -92,7 +92,7 @@ function phpc_categories_table() {
 }
 
 function phpc_config_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'config');
+	$table = new SqlTable(SQL_PREFIX . 'config');
 	
 	$table->addColumn('name', "varchar(255) COLLATE utf8_unicode_ci NOT NULL");
 	$table->addColumn('value', "varchar(255) COLLATE utf8_unicode_ci NOT NULL");
@@ -103,7 +103,7 @@ function phpc_config_table() {
 }
 
 function phpc_events_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'events');
+	$table = new SqlTable(SQL_PREFIX . 'events');
 
 	$table->addColumn('eid', "int(11) unsigned NOT NULL auto_increment");
 	$table->addColumn('cid', "int(11) unsigned NOT NULL");
@@ -121,7 +121,7 @@ function phpc_events_table() {
 }
 
 function phpc_groups_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'groups');
+	$table = new SqlTable(SQL_PREFIX . 'groups');
 
 	$table->addColumn('gid', "int(11) unsigned NOT NULL auto_increment");
 	$table->addColumn('cid', "int(11) unsigned");
@@ -133,7 +133,7 @@ function phpc_groups_table() {
 }
 
 function phpc_logins_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'logins');
+	$table = new SqlTable(SQL_PREFIX . 'logins');
 
 	$table->addColumn('uid', "int(11) unsigned NOT NULL");
 	$table->addColumn('series', "char(43) COLLATE utf8_unicode_ci NOT NULL");
@@ -146,7 +146,7 @@ function phpc_logins_table() {
 }
 
 function phpc_occurrences_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'occurrences');
+	$table = new SqlTable(SQL_PREFIX . 'occurrences');
 
 	$table->addColumn('oid', "int(11) unsigned NOT NULL auto_increment");
 	$table->addColumn('eid', "int(11) unsigned NOT NULL");
@@ -163,7 +163,7 @@ function phpc_occurrences_table() {
 }
 
 function phpc_permissions_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'permissions');
+	$table = new SqlTable(SQL_PREFIX . 'permissions');
 
 	$table->addColumn('cid', 'int(11) unsigned NOT NULL');
 	$table->addColumn('uid', 'int(11) unsigned NOT NULL');
@@ -179,7 +179,7 @@ function phpc_permissions_table() {
 }
 
 function phpc_users_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'users');
+	$table = new SqlTable(SQL_PREFIX . 'users');
 
 	$table->addColumn('uid', 'int(11) unsigned NOT NULL auto_increment');
 	$table->addColumn('username', 'varchar(255) COLLATE utf8_unicode_ci NOT NULL');
@@ -199,7 +199,7 @@ function phpc_users_table() {
 }
 
 function phpc_user_groups_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'user_groups');
+	$table = new SqlTable(SQL_PREFIX . 'user_groups');
 
 	$table->addColumn('gid', "int(11) unsigned");
 	$table->addColumn('uid', "int(11) unsigned");
@@ -208,7 +208,7 @@ function phpc_user_groups_table() {
 }
 
 function phpc_fields_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'fields');
+	$table = new SqlTable(SQL_PREFIX . 'fields');
 
 	$table->addColumn('fid', 'int(11) unsigned NOT NULL');
 	$table->addColumn('cid', 'int(11) unsigned DEFAULT NULL');
@@ -220,7 +220,7 @@ function phpc_fields_table() {
 }
 
 function phpc_event_fields_table() {
-	$table = new PhpcSqlTable(SQL_PREFIX . 'event_fields');
+	$table = new SqlTable(SQL_PREFIX . 'event_fields');
 
 	$table->addColumn('eid', 'int(11) unsigned NOT NULL');
 	$table->addColumn('fid', 'int(11) unsigned NOT NULL');
@@ -229,9 +229,8 @@ function phpc_event_fields_table() {
 	return $table;
 }
 
-function phpc_updatedb($dbh) {
-	global $phpc_script, $phpcdb;
-
+function phpc_updatedb(Context $context)
+{
 	$message_tags = tag('div', tag('div', __("Updating calendar")));
 
 	$updated = false;
@@ -241,12 +240,12 @@ function phpc_updatedb($dbh) {
 		if(sizeof($tags) > 0)
 			$updated = true;
 	}
-	$phpcdb->set_config("version", PHPC_DB_VERSION);
+	$context->db->set_config("version", PHPC_DB_VERSION);
 
 	if(!$updated)
 		$message_tags->add(tag('div', __('Already up to date.')));
 
-	message_redirect($message_tags, $phpc_script);
+	message_redirect($message_tags, PHPC_SCRIPT);
 }
 
 ?>

@@ -15,56 +15,52 @@
  * limitations under the License.
  */
 
-require_once("$phpc_includes_path/phpccalendar.class.php");
-require_once("$phpc_includes_path/phpcevent.class.php");
-require_once("$phpc_includes_path/phpcoccurrence.class.php");
-require_once("$phpc_includes_path/phpcuser.class.php");
+namespace PhpCalendar;
 
-class PhpcDatabase {
+use PhpCalendar\Event;
+use PhpCalendar\Occurrence;
+use PhpCalendar\User;
+use PhpCalendar\Calendar;
+
+class Database {
 	var $dbh;
 	var $calendars;
 	var $config;
+	var $event_columns;
+	var $occurrence_columns;
+	var $user_fields;
 
-	function __construct($host, $username, $passwd, $dbname, $port) {
+	function __construct() {
+		if(!defined("SQL_PORT"))
+			define("SQL_PORT", ini_get("mysqli.default_port"));
+
+		// TODO: Check somewhere that these constants are defined
+
 		// Make the database connection.
-		$this->dbh = new mysqli($host, $username, $passwd, $dbname,
-				$port);
+		$this->dbh = @new \mysqli(SQL_HOST, SQL_USER, SQL_PASSWD, SQL_DATABASE, SQL_PORT);
 
-		if(mysqli_connect_errno()) {
-			soft_error("Database connect failed ("
-					. mysqli_connect_errno() . "): "
-					. mysqli_connect_error());
+		if($this->dbh->connect_errno) {
+			soft_error("Database connect failed ({$this->dbh->connect_errno}): {$this->db->connect_error}");
 		}
 
 		$this->dbh->set_charset("utf8");
+
+		// TODO: Make these const
+		$this->event_columns = "`" . SQL_PREFIX . "categories`.`gid`, `" . SQL_PREFIX . "events`.`subject`, `"
+			. SQL_PREFIX . "events`.`description`, `" . SQL_PREFIX . "events`.`owner`, `" . SQL_PREFIX
+			. "events`.`eid`, `" . SQL_PREFIX . "events`.`cid`, `" . SQL_PREFIX . "events`.`readonly`, `" . SQL_PREFIX
+			. "events`.`catid`, UNIX_TIMESTAMP(`ctime`) AS `ctime`, UNIX_TIMESTAMP(`mtime`) AS `mtime`";
+
+		$this->occurrence_columns = $this->event_columns . ", `time_type`, `oid`, "
+			. "UNIX_TIMESTAMP(`start_ts`) AS `start_ts`, DATE_FORMAT(`start_date`, '%Y%m%d') AS `start_date`, "
+			. "UNIX_TIMESTAMP(`end_ts`) AS `end_ts`, DATE_FORMAT(`end_date`, '%Y%m%d') AS `end_date`\n";
+
+		$this->user_fields = "`" . SQL_PREFIX . "users`.`uid`, `username`, `password`, `" . SQL_PREFIX
+			. "users`.`admin`, `password_editable`, `default_cid`, `timezone`, `language`, `disabled`";
 	}
 
 	function __destruct() {
 		$this->dbh->close();
-	}
-
-	private function get_event_columns() {
-		$events_table = SQL_PREFIX . "events";
-		$cats_table = SQL_PREFIX . "categories";
-		$fields = array('subject', 'description', 'owner', 'eid', 'cid',
-				'readonly', 'catid');
-		return "`$cats_table`.`gid`, `$events_table`.`"
-			. implode("`, `$events_table`.`", $fields) . "`, "
-			. "UNIX_TIMESTAMP(`ctime`) AS `ctime`, "
-			. "UNIX_TIMESTAMP(`mtime`) AS `mtime`";
-	}
-
-	private function get_occurrence_columns() {
-		return $this->get_event_columns() . ", `time_type`, `oid`, "
-			. "UNIX_TIMESTAMP(`start_ts`) AS `start_ts`, "
-			. "DATE_FORMAT(`start_date`, '%Y%m%d') AS `start_date`, "
-			. "UNIX_TIMESTAMP(`end_ts`) AS `end_ts`, "
-			. "DATE_FORMAT(`end_date`, '%Y%m%d') AS `end_date`\n";
-	}
-
-	private function get_user_fields() {
-		$users_table = SQL_PREFIX . "users";
-		return "`$users_table`.`uid`, `username`, `password`, `$users_table`.`admin`, `password_editable`, `default_cid`, `timezone`, `language`, `disabled`";
 	}
 
 	// returns all the events for a particular day
@@ -80,45 +76,47 @@ class PhpcDatabase {
 		$users_table = SQL_PREFIX . 'users';
 		$cats_table = SQL_PREFIX . 'categories';
 
-		$query = "SELECT " . $this->get_occurrence_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+		$query = "SELECT {$this->occurrence_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
                         ."INNER JOIN `$occurrences_table` USING (`eid`)\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
-			."LEFT JOIN `$cats_table` ON `$events_table`.`catid` "
-			."= `$cats_table`.`catid`\n"
+			."LEFT JOIN `$cats_table` ON `$events_table`.`catid` = `$cats_table`.`catid`\n"
 			."WHERE `$events_table`.`cid` = '$cid'\n"
-			."	AND IF(`start_ts`, `start_ts` <= $to_str, `start_date` <= DATE($to_str))\n"
-			."	AND IF(`end_ts`, `end_ts` >= $from_str, `end_date` >= DATE($from_str))\n"
+			."	AND IF(`start_ts`, `start_ts` <= FROM_UNIXTIME(?), `start_date` <= DATE(FROM_UNIXTIME(?)))\n"
+			."	AND IF(`end_ts`, `end_ts` >= FROM_UNIXTIME(?), `end_date` >= DATE(FROM_UNIXTIME(?)))\n"
 			."	ORDER BY `start_ts`, `start_date`, `oid`";
-
-		$results = $this->dbh->query($query)
-			or $this->db_error(__('Error in get_occurrences_by_date_range'),
-					$query);
-
-		return $results;
+		$stmt = $this->dbh->prepare($query);
+		$stmt->bind_param('ssss', $to_str, $to_str, $from_str, $from_str);
+		$stmt->execute()
+			or $this->db_error(__('Error in get_occurrences_by_date_range'), $query);
+		return $stmt->get_result();
         }
 		
 	/* if category is visible to user id */
-	function is_cat_visible($uid, $catid) {
+	function is_cat_visible(User $user, $catid)
+	{
 		$users_table = SQL_PREFIX . 'users';
 		$user_groups_table = SQL_PREFIX . 'user_groups';
 		$cats_table = SQL_PREFIX . 'categories';
 
-		if (is_admin())
+		if ($user->is_admin())
 			return true;
 
 		$query = "SELECT * FROM `$users_table` u\n"
 			."JOIN `$user_groups_table` ug USING (`uid`)\n"
 			."JOIN `$cats_table` c ON c.`gid`=ug.`gid`\n"
-			."WHERE c.`catid`='$catid' AND u.`uid`='$uid'";
+			."WHERE c.`catid`=? AND u.`uid`=?";
 
-		$results = $this->dbh->query($query);
+		$stmt = $this->dbh->prepare($query);
+		$stmt->bind_params('ii', $catid, $user->uid);
+		$stmt->execute()
+			or soft_error(__("Error executing SQL statement in is_cat_visible."));
 
+		$results = $stmt->get_result();
 		if(!$results)
 			return false;
 
-		return $results->num_rows>0;
+		return $results->num_rows > 0;
 	}
 
 	// returns all the events for a particular day
@@ -137,18 +135,21 @@ class PhpcDatabase {
 		$users_table = SQL_PREFIX . 'users';
 		$cats_table = SQL_PREFIX . 'categories';
 
-		$query = "SELECT " . $this->get_event_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+		$query = "SELECT {$this->event_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
 			."LEFT JOIN `$cats_table` USING (`catid`)\n"
-			."WHERE `eid` = '$eid'\n";
+			."WHERE `eid` = ?\n";
 
-		$sth = $this->dbh->query($query)
-			or $this->db_error(__('Error in get_event_by_eid'),
-					$query);
+		$stmt = $this->dbh->prepare($query);
+		$stmt->bind_param('i', $eid);
+		$result = $stmt->execute()
+			or $this->db_error(__('Error in get_event_by_eid'), $query);
 
-		return $sth->fetch_assoc();
+		$arr = $result->fetch_assoc();
+		if(!$arr)
+			return false;
+		return new Event($arr);
 	}
 
 	// returns the event that corresponds to oid
@@ -159,8 +160,7 @@ class PhpcDatabase {
 		$users_table = SQL_PREFIX . 'users';
 		$cats_table = SQL_PREFIX . 'categories';
 
-		$query = "SELECT " . $this->get_event_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+		$query = "SELECT {$this->event_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
 			."LEFT JOIN `$occurrences_table` USING (`eid`)\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
@@ -337,8 +337,7 @@ class PhpcDatabase {
 		$users_table = SQL_PREFIX . 'users';
 		$cats_table = SQL_PREFIX . 'categories';
 
-                $query = "SELECT " . $this->get_occurrence_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+                $query = "SELECT {$this->occurrence_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
                         ."INNER JOIN `$occurrences_table` USING (`eid`)\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
@@ -352,7 +351,7 @@ class PhpcDatabase {
 		$result = $sth->fetch_assoc()
 			or soft_error(__("Event doesn't exist with oid") . ": $oid");
 
-		return new PhpcOccurrence($result);
+		return new Occurrence($result);
 	}
 
 	// returns the categories for calendar $cid
@@ -403,8 +402,7 @@ class PhpcDatabase {
 		$users_table = SQL_PREFIX . 'users';
 		$cats_table = SQL_PREFIX . 'categories';
 
-                $query = "SELECT " . $this->get_occurrence_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+                $query = "SELECT {$this->occurrence_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
                         ."INNER JOIN `$occurrences_table` USING (`eid`)\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
@@ -418,7 +416,7 @@ class PhpcDatabase {
 
 		$events = array();
 		while($row = $result->fetch_assoc()) {
-			$events[] = new PhpcOccurrence($row);
+			$events[] = new Occurrence($row);
 		}
 		return $events;
         }
@@ -584,8 +582,7 @@ class PhpcDatabase {
 		while($result = $sth->fetch_assoc()) {
 			$cid = $result["cid"];
 			if(empty($this->calendars[$cid]))
-				$this->calendars[$cid] =
-					new PhpcCalendar($result);
+				$this->calendars[$cid] = new Calendar($this, $result);
 		}
 
 		return $this->calendars;
@@ -650,7 +647,7 @@ class PhpcDatabase {
 
 		$users = array();
 		while($user = $sth->fetch_assoc()) {
-			$users[] = new PhpcUser($user);
+			$users[] = new User($user);
 		}
 		return $users;
 	}
@@ -677,8 +674,8 @@ class PhpcDatabase {
 
 	function get_user_by_name($username)
 	{
-		$query = "SELECT " . $this->get_user_fields()
-			."\nFROM ".SQL_PREFIX."users\n"
+		$query = "SELECT {$this->user_fields}\n"
+			."FROM ".SQL_PREFIX."users\n"
 			."WHERE username='$username'";
 
 		$sth = $this->dbh->query($query)
@@ -686,14 +683,14 @@ class PhpcDatabase {
 
 		$result = $sth->fetch_assoc();
 		if($result)
-			return new PhpcUser($result);
+			return new User($this, $result);
 		else
 			return false;
 	}
 
 	function get_user($uid)
 	{
-		$query = "SELECT " . $this->get_user_fields()
+		$query = "SELECT {$this->user_fields}\n"
 			."FROM ".SQL_PREFIX."users\n"
 			."WHERE `uid`='$uid'";
 
@@ -702,7 +699,7 @@ class PhpcDatabase {
 
 		$result = $sth->fetch_assoc();
 		if($result)
-			return new PhpcUser($result);
+			return new User($this, $result);
 		else
 			return false;
 	}
@@ -1018,8 +1015,7 @@ class PhpcDatabase {
 		if($end)
 			$where .= "AND IF(`end_ts`, `end_ts` >= $start_str, `end_date` >= DATE($end_str))\n";
 
-                $query = "SELECT " . $this->get_occurrence_columns()
-			.", `username`, `name`, `bg_color`, `text_color`\n"
+                $query = "SELECT {$this->occurrence_columns}, `username`, `name`, `bg_color`, `text_color`\n"
 			."FROM `$events_table`\n"
                         ."INNER JOIN `$occurrences_table` USING (`eid`)\n"
 			."LEFT JOIN `$users_table` ON `uid` = `owner`\n"
@@ -1033,7 +1029,7 @@ class PhpcDatabase {
 
 		$events = array();
 		while($row = $result->fetch_assoc()) {
-			$events[] = new PhpcOccurrence($row);
+			$events[] = new Occurrence($row);
 		}
 		return $events;
 	}
@@ -1104,7 +1100,7 @@ class PhpcDatabase {
 
 	function cleanup_login_tokens() {
 		$query = "DELETE FROM ".SQL_PREFIX."logins\n"
-			."WHERE `atime` < DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+			."WHERE `atime` < DATE_SUB(CURDATE(), INTERVAL 31 DAY)";
 
 		$this->dbh->query($query)
 			or $this->db_error(__("Error cleaning login tokens."),
@@ -1121,7 +1117,7 @@ class PhpcDatabase {
 				. htmlspecialchars($query, ENT_COMPAT, "UTF-8")
 				. "</pre>";
 		}
-		throw new Exception($string);
+		throw new \Exception($string);
 	}
 
 }

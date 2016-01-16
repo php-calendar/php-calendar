@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright 2009 Sean Proctor
+ * Copyright 2016 Sean Proctor
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
  * limitations under the License.
  */
 
-if(!defined('IN_PHPC')) {
-       die("Hacking attempt");
-}
+namespace PhpCalendar;
 
 /*
  * data structure to display XHTML
@@ -52,16 +50,14 @@ class Html {
         function add() {
                 $htmlElements = func_get_args();
                 foreach($htmlElements as $htmlElement) {
-			if(is_a($htmlElement, 'AttributeList')) {
+			if($htmlElement instanceof AttributeList) {
 				$this->attributeList = $htmlElement;
 			} elseif(is_array($htmlElement)) {
                                 foreach($htmlElement as $element) {
                                         $this->add($element);
                                 }
-                        } elseif(is_object($htmlElement)
-                                        && !is_a($htmlElement, 'Html')) {
-                                $this->html_error('Invalid class: '
-                                                . get_class($htmlElement));
+                        } elseif(is_object($htmlElement) && !$htmlElement instanceof Html) {
+                                $this->html_error('Invalid class: ' . get_class($htmlElement));
                         } else {
                                 $this->childElements[] = $htmlElement;
                         }
@@ -76,13 +72,10 @@ class Html {
                                                 as $element) {
                                         $this->prepend($element);
                                 }
-                        } elseif(is_object($htmlElement)
-                                        && !is_a($htmlElement, 'Html')) {
-                                $this->html_error('Invalid class: '
-                                                . get_class($htmlElement));
+                        } elseif(is_object($htmlElement) && !$htmlElement instanceof Html) {
+                                $this->html_error('Invalid class: ' . get_class($htmlElement));
                         } else {
-                                array_unshift($this->childElements,
-                                                $htmlElement);
+                                array_unshift($this->childElements, $htmlElement);
                         }
                 }
         }
@@ -108,11 +101,10 @@ class Html {
 
                 foreach($this->childElements as $child) {
                         if(is_object($child)) {
-                                if(is_a($child, 'Html')) {
+                                if($child instanceof Html) {
                                         $output .= $child->toString();
                                 } else {
-                                        $this->html_error('Invalid class: '
-                                                        . get_class($child));
+                                        $this->html_error('Invalid class: ' . get_class($child));
                                 }
                         } else {
                                 $output .= $child;
@@ -156,74 +148,6 @@ class Html {
 		return call_user_func_array($this->error_func, $args);
 	}
 }
-
-/*
- * Data structure to display XML style attributes
- * see function attributes() below for usage
- */
-class AttributeList {
-        var $list;
-
-        function __construct() {
-                $this->list = array();
-                $args = func_get_args();
-                $this->add($args);
-        }
-
-        function add() {
-                $args = func_get_args();
-                foreach($args as $arg) {
-                        if(is_array($arg)) {
-                                foreach($arg as $attr) {
-                                        $this->add($attr);
-                                }
-                        } else {
-                                $this->list[] = $arg;
-                        }
-                }
-        }
-
-        function toString() {
-                return implode(' ', $this->list);
-        }
-}
-
-/*
- * creates an Html data structure
- * arguments are tagName [AttributeList] [Html | array | string] ...
- * where array contains an array, Html, or a string, same requirements for that
- * array
- */
-function tag()
-{
-        $args = func_get_args();
-        $html = new Html();
-        call_user_func_array(array(&$html, '__construct'), $args);
-        return $html;
-}
-
-/*
- * creates an AttributeList data structure
- * arguments are [attribute | array] ...
- * where attribute is a string of name="value" and array contains arrays or
- * attributes
- */
-function attributes()
-{
-        $args = func_get_args();
-        $attrs = new AttributeList();
-        call_user_func_array(array(&$attrs, '__construct'), $args);
-        return $attrs;
-}
-
-function attrs()
-{
-        $args = func_get_args();
-        $attrs = new AttributeList();
-        call_user_func_array(array(&$attrs, '__construct'), $args);
-        return $attrs;
-}
-
 
 // creates a select tag element for a form
 // returns HTML data for the element
