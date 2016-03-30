@@ -294,27 +294,25 @@ function create_action_link(Context $context, $text, $action, $args = false, $at
 }
 
 // takes a menu $html and appends an entry
-function menu_item_append(Context $context, Html &$html, $name, $action, $args = false, $attribs = false)
+function menu_item_append(Context $context, Html &$html, $name, $action, $args = false, $attribs = false, $icon = false)
 {
-	$name=str_replace(' ','&nbsp;',$name); /*not breaking space on menus*/
+	$text = str_replace(' ', '&nbsp;', $name);
+	if (!empty($icon))
+		$text = fa($icon) . "&nbsp;$text";
 
-	if(!is_object($html)) {
-		soft_error('Html is not a valid Html class.');
-	}
-	$html->add(create_action_link($context, $name, $action, $args, $attribs));
+	$html->add(create_action_link($context, $text, $action, $args, $attribs));
 	$html->add("\n");
 }
 
 // takes a menu $html and appends an entry with the date
-function menu_item_append_with_date(&$html, $name, $action, $year = false,
-		$month = false, $day = false, $attribs = false)
+function menu_item_append_with_date(Html &$html, $name, $action, $year = false,
+		$month = false, $day = false, $attribs = false, $icon = false)
 {
-	$name = str_replace(' ','&nbsp;',$name);
+	$text = str_replace(' ', '&nbsp;', $name);
+	if (!empty($icon))
+		$text = fa($icon) . "&nbsp;$text";
 
-	if(!is_object($html)) {
-		soft_error('Html is not a valid Html class.');
-	}
-	$html->add(create_action_link_with_date($name, $action, $year, $month, $day, $attribs));
+	$html->add(create_action_link_with_date($text, $action, $year, $month, $day, $attribs));
 	$html->add("\n");
 }
 
@@ -322,9 +320,6 @@ function menu_item_append_with_date(&$html, $name, $action, $year = false,
 function menu_item_prepend(Context $context, Html &$html, $name, $action, $args = false,
 		$attribs = false)
 {
-	if(!is_object($html)) {
-		soft_error('Html is not a valid Html class.');
-	}
 	$html->prepend("\n");
 	$html->prepend(create_action_link($context, $name, $action, $args, $attribs));
 }
@@ -391,6 +386,11 @@ function create_dropdown_list($title, $values, $attrs = false) {
 			$list);
 }
 
+function fa($name)
+{
+	return "<span class=\"fa fa-$name\"></span>";
+}
+
 // creates the user menu
 // returns tag data for the menu
 function user_menu(Context $context)
@@ -406,14 +406,16 @@ function user_menu(Context $context)
 	$html = tag('div', attrs('class="phpc-logged ui-widget-content"'), $welcome, $span);
 
 	if($context->action != 'user_settings')
-		menu_item_append($context, $span, __('Settings'), 'user_settings');
+		menu_item_append($context, $span, __('Settings'), 'user_settings', false, false, 'cog');
 		
 	if($context->user->is_user()) {
 		menu_item_append($context, $span, __('Log out'), 'logout',
-				array('lasturl' => escape_entities(urlencode($_SERVER['QUERY_STRING']))));
+				array('lasturl' => escape_entities(urlencode($_SERVER['QUERY_STRING']))),
+				false, 'sign-out');
 	} else {
 		menu_item_append($context, $span, __('Log in'), 'login',
-				array('lasturl' => escape_entities(urlencode($_SERVER['QUERY_STRING']))));
+				array('lasturl' => escape_entities(urlencode($_SERVER['QUERY_STRING']))),
+				false, 'sign-in');
 	}
 	return $html;
 }
@@ -675,6 +677,8 @@ function get_page($action)
 			return new MonthPage;
 		case 'display_day':
 			return new DayPage;
+		case 'login':
+			return new LoginPage;
 		default:
 			soft_error(__('Invalid action'));
 	}

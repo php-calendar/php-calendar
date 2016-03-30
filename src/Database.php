@@ -582,7 +582,7 @@ class Database {
 		while($result = $sth->fetch_assoc()) {
 			$cid = $result["cid"];
 			if(empty($this->calendars[$cid]))
-				$this->calendars[$cid] = new Calendar($this, $result);
+				$this->calendars[$cid] = Calendar::createFromMap($this, $result);
 		}
 
 		return $this->calendars;

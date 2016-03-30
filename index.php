@@ -66,9 +66,9 @@ $min = defined('PHPC_DEBUG') ? '' : '.min';
 $theme = $context->calendar->theme;
 if(empty($theme))
 	$theme = 'smoothness';
-$jquery_version = "1.11.1";
-$jqueryui_version = "1.11.2";
-$fa_version = "4.2.0";
+$jquery_version = "1.12.2";
+$jqueryui_version = "1.11.4";
+$fa_version = "4.5.0";
 
 if(!isset($jqui_path))
 	$jqui_path = "//ajax.googleapis.com/ajax/libs/jqueryui/$jqueryui_version";

@@ -35,20 +35,26 @@ class Calendar {
 	var $fields;
 	var $db;
 
-	function __construct(Database $db, $result) {
-		$this->db = $db;
+	private function __construct() {
+	}
 
-		$this->cid = $result['cid'];
-		$this->title = $result['title'];
-		$this->hours_24 = $result['hours_24'];
-		$this->date_format = $result['date_format'];
-		$this->week_start = $result['week_start'];
-		$this->subject_max = $result['subject_max'];
-		$this->events_max = $result['events_max'];
-		$this->anon_permission = $result['anon_permission'];
-		$this->timezone = $result['timezone'];
-		$this->language = $result['language'];
-		$this->theme = $result['theme'];
+	public static function createFromMap(Database $db, $result) {
+		$calendar = new Calendar();
+
+		$calendar->db = $db;
+		$calendar->cid = $result['cid'];
+		$calendar->title = $result['title'];
+		$calendar->hours_24 = $result['hours_24'];
+		$calendar->date_format = $result['date_format'];
+		$calendar->week_start = $result['week_start'];
+		$calendar->subject_max = $result['subject_max'];
+		$calendar->events_max = $result['events_max'];
+		$calendar->anon_permission = $result['anon_permission'];
+		$calendar->timezone = $result['timezone'];
+		$calendar->language = $result['language'];
+		$calendar->theme = $result['theme'];
+
+		return $calendar;
 	}
 
 	function get_title()
