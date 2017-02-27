@@ -25,7 +25,7 @@ class PhpcUser {
 	var $language;
 	var $groups;
 
-	function PhpcUser($result)
+	function __construct($result)
 	{
 		$this->uid = $result['uid'];
 		$this->username = $result['username'];

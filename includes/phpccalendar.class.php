@@ -31,7 +31,7 @@ class PhpcCalendar {
 	var $theme;
 	var $groups;
 
-	function PhpcCalendar($result) {
+	function __construct($result) {
 		$this->cid = $result['cid'];
 		$this->title = $result['title'];
 		$this->hours_24 = $result['hours_24'];
